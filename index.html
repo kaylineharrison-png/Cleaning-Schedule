@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#6d5dfc"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="CleanWeek"><link rel="manifest" href="manifest.json">
+<title>CleanWeek</title>
+<style>
+:root{--bg:#f7f7fb;--card:#fff;--text:#17171b;--muted:#777782;--accent:#6d5dfc;--line:#e9e9ef}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif}
+.app{max-width:720px;margin:auto;padding:env(safe-area-inset-top) 16px calc(90px + env(safe-area-inset-bottom))}
+header{padding:22px 4px 14px}h1{margin:0;font-size:31px}button{font:inherit;border:0;cursor:pointer}
+.progress,.card{background:var(--card);border-radius:22px;box-shadow:0 3px 18px #0000000a}.progress{padding:18px;margin-bottom:14px}
+.row{display:flex;justify-content:space-between}.pct{font-size:27px;font-weight:750}.bar{height:9px;background:#ececf2;border-radius:99px;overflow:hidden;margin-top:12px}.fill{height:100%;background:var(--accent);transition:.25s}
+.tabs{display:flex;background:#ececf2;border-radius:15px;padding:4px;margin-bottom:14px}.tab{flex:1;padding:10px;border-radius:12px;background:none;color:var(--muted);font-weight:650}.tab.active{background:var(--card);color:var(--text);box-shadow:0 2px 8px #0000001a}
+.days{display:flex;gap:8px;overflow:auto;padding:2px 0 12px}.day{min-width:72px;background:var(--card);padding:10px 8px;border-radius:17px;text-align:center;border:2px solid transparent;color:var(--text)}.day.active{border-color:var(--accent)}.day.today .num{color:var(--accent)}.dow{font-size:12px;color:var(--muted)}.num{font-size:19px;font-weight:700;margin-top:3px}
+.card{padding:8px 14px}.task{display:flex;align-items:center;gap:12px;padding:14px 2px;border-bottom:1px solid var(--line)}.task:last-child{border:0}.check{width:27px;height:27px;border-radius:50%;border:2px solid #c9c9d2;background:white;flex:none}.check.on{background:var(--accent);border-color:var(--accent);color:white}.done .name{text-decoration:line-through;color:var(--muted)}.name{font-weight:600}.meta{font-size:12px;color:var(--muted);margin-top:3px}.empty{text-align:center;padding:38px 15px;color:var(--muted)}
+.fab{position:fixed;right:20px;bottom:calc(24px + env(safe-area-inset-bottom));width:60px;height:60px;border-radius:20px;background:var(--accent);color:white;font-size:30px;box-shadow:0 8px 24px #6d5dfc55}
+dialog{border:0;border-radius:25px;width:min(92%,480px);padding:0;box-shadow:0 20px 60px #0004}dialog::backdrop{background:#0007}.modal{padding:22px}.modal h2{margin-top:0}label{display:block;font-size:13px;font-weight:650;margin:14px 0 6px}input:not([type=checkbox]),select{width:100%;padding:13px;border:1px solid var(--line);border-radius:13px;font:inherit;background:#fafafd}.actions{display:flex;gap:10px;margin-top:20px}.actions button{flex:1;padding:13px;border-radius:14px}.primary{background:var(--accent);color:white}.secondary{background:#eeeef3}.link{background:none;color:var(--accent);font-weight:650}
+@media(prefers-color-scheme:dark){:root{--bg:#111116;--card:#1d1d23;--text:#f5f5f7;--muted:#a4a4ae;--line:#303038}.bar,.tabs{background:#303038}.check{background:#1d1d23}.secondary{background:#303038;color:var(--text)}input:not([type=checkbox]),select{background:#25252c;color:var(--text)}dialog{background:var(--card);color:var(--text)}}
+</style></head><body>
+<div class="app"><header><h1>CleanWeek</h1><div style="color:var(--muted);margin-top:3px">Your daily &amp; weekly cleaning plan</div></header>
+<div class="tabs"><button class="tab" id="tab-daily" onclick="setTab('daily')">Daily</button><button class="tab" id="tab-weekly" onclick="setTab('weekly')">Weekly</button></div>
+<section class="progress"><div class="row"><strong id="ptitle">Today</strong><span class="pct" id="pct">0%</span></div><div class="bar"><div class="fill" id="fill"></div></div><div id="count" style="font-size:13px;color:var(--muted);margin-top:8px"></div></section>
+<div class="days" id="days"></div><section class="card" id="tasks"></section></div>
+<button class="fab" onclick="openAdd()">+</button>
+<dialog id="dlg"><form class="modal" onsubmit="saveTask(event)"><h2 id="title">Add cleaning task</h2>
+<label>Task</label><input id="taskName" required placeholder="Vacuum living room">
+<label>Room / area</label><input id="room" placeholder="Living room">
+<label>Repeats</label><select id="freq" onchange="syncDayField()"><option value="daily">Every day</option><option value="weekly">Once a week</option></select>
+<div id="dayWrap"><label>Day</label><select id="day"></select></div>
+<div class="actions"><button type="button" class="secondary" onclick="dlg.close()">Cancel</button><button class="primary">Save task</button></div></form></dialog>
+<script>
+const KEY="cleanweek-v1";let editing=null;
+const names=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],short=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+function ymd(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function weekStart(d=new Date()){let x=new Date(d),n=x.getDay();x.setDate(x.getDate()+(n===0?-6:1-n));x.setHours(0,0,0,0);return ymd(x)}
+function todayIdx(){return (new Date().getDay()+6)%7+1}
+let data=JSON.parse(localStorage.getItem(KEY)||"null")||{tasks:[],week:weekStart(),selected:todayIdx(),tab:"daily"};
+/* migrate older saved tasks: they were all weekly */
+data.tasks.forEach(t=>{if(!t.type)t.type="weekly";if(t.type==="daily"&&!t.doneDates)t.doneDates={}});
+if(!data.tab)data.tab="daily";
+/* weekly tasks reset each new week; daily tasks keep per-date history so they reset on their own every day */
+if(data.week!==weekStart()){data.week=weekStart();data.selected=todayIdx();data.tasks.forEach(t=>{if(t.type==="weekly")t.done=false});
+  let cutoff=new Date();cutoff.setDate(cutoff.getDate()-60);let c=ymd(cutoff);
+  data.tasks.forEach(t=>{if(t.doneDates)Object.keys(t.doneDates).forEach(k=>{if(k<c)delete t.doneDates[k]})})}
+function save(){localStorage.setItem(KEY,JSON.stringify(data))}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function dateOf(i){let d=new Date(data.week+"T00:00:00");d.setDate(d.getDate()+i-1);return d}
+function isDone(t){return t.type==="daily"?!!(t.doneDates&&t.doneDates[ymd(dateOf(data.selected))]):!!t.done}
+function render(){
+  let isDaily=data.tab==="daily",s=new Date(data.week+"T00:00:00"),nowIdx=todayIdx();
+  document.getElementById("tab-daily").classList.toggle("active",isDaily);document.getElementById("tab-weekly").classList.toggle("active",!isDaily);
+  document.getElementById("days").innerHTML=names.map((n,i)=>{let d=new Date(s);d.setDate(s.getDate()+i);return `<button class="day ${data.selected===i+1?"active":""} ${nowIdx===i+1?"today":""}" onclick="selectDay(${i+1})"><div class="dow">${short[i]}</div><div class="num">${d.getDate()}</div></button>`}).join("");
+  let pool=data.tasks.filter(t=>t.type===(isDaily?"daily":"weekly"));
+  let ts=isDaily?pool:pool.filter(t=>t.day===data.selected);
+  document.getElementById("tasks").innerHTML=ts.length?ts.map(t=>{let d=isDone(t);return `<div class="task ${d?"done":""}"><button class="check ${d?"on":""}" onclick="toggle('${t.id}')">${d?"✓":""}</button><div style="flex:1"><div class="name">${esc(t.name)}</div><div class="meta">${esc(t.room||"")}${t.room?" · ":""}${isDaily?"Every day":"Weekly"}</div></div><button class="link" onclick="editTask('${t.id}')">Edit</button></div>`}).join(""):
+    `<div class="empty">${isDaily?"No daily tasks yet.":"Nothing scheduled for "+names[data.selected-1]+"."}<br>Add a cleaning task with +</div>`;
+  let total=pool.length,done=pool.filter(isDone).length,p=total?Math.round(done/total*100):0;
+  document.getElementById("ptitle").textContent=isDaily?(data.selected===nowIdx?"Today":names[data.selected-1]):"This week";
+  document.getElementById("pct").textContent=p+"%";document.getElementById("fill").style.width=p+"%";
+  document.getElementById("count").textContent=`${done} of ${total} completed`;save()}
+function setTab(t){data.tab=t;render()}
+function selectDay(n){data.selected=n;render()}
+function toggle(id){let t=data.tasks.find(x=>x.id===id);if(!t)return;
+  if(t.type==="daily"){t.doneDates=t.doneDates||{};let k=ymd(dateOf(data.selected));if(t.doneDates[k])delete t.doneDates[k];else t.doneDates[k]=true}
+  else t.done=!t.done;render()}
+function fillDays(v){day.innerHTML=names.map((n,i)=>`<option value="${i+1}" ${v===i+1?"selected":""}>${n}</option>`).join("")}
+function syncDayField(){dayWrap.style.display=freq.value==="weekly"?"block":"none"}
+function openAdd(){editing=null;title.textContent="Add cleaning task";taskName.value="";room.value="";freq.value=data.tab;fillDays(data.selected);syncDayField();dlg.showModal()}
+function editTask(id){let t=data.tasks.find(x=>x.id===id);if(!t)return;editing=id;title.textContent="Edit cleaning task";taskName.value=t.name;room.value=t.room||"";freq.value=t.type;fillDays(t.day||data.selected);syncDayField();dlg.showModal()}
+function saveTask(e){e.preventDefault();let old=editing?data.tasks.find(t=>t.id===editing):null;
+  let obj={id:editing||crypto.randomUUID(),name:taskName.value.trim(),room:room.value.trim(),type:freq.value,day:+day.value,done:old?!!old.done:false,doneDates:old?(old.doneDates||{}):{}};
+  if(editing)data.tasks[data.tasks.findIndex(t=>t.id===editing)]=obj;else data.tasks.push(obj);
+  data.tab=obj.type;dlg.close();render()}
+render();if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js");
+</script></body></html>

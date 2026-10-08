@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4a6c6"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Cleaning"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" href="icon-192.png">
+<title>My Cleaning Schedule</title>
+<style>
+:root{--bg:#fbf7ff;--card:#fff;--text:#4b4563;--muted:#9a93b0;--line:#f0eaf8;--daily:#f4a6c6;--dsoft:#fde4ef;--weekly:#8fd3c2;--wsoft:#def5ee;--accent:var(--daily);--soft:var(--dsoft);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root[data-tab=weekly]{--accent:var(--weekly);--soft:var(--wsoft)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1c1a26;--card:#272435;--text:#ece8f7;--muted:#a29bb8;--line:#38344a;--daily:#e58fb5;--dsoft:#3d2a3a;--weekly:#78c4b0;--wsoft:#24403a}}
+:root[data-theme="dark"]{--bg:#1c1a26;--card:#272435;--text:#ece8f7;--muted:#a29bb8;--line:#38344a;--daily:#e58fb5;--dsoft:#3d2a3a;--weekly:#78c4b0;--wsoft:#24403a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;transition:background .3s}
+.app{max-width:720px;margin:auto;padding:0 16px 100px}
+header{padding:22px 4px 14px}h1{margin:0;font-size:27px}button{font:inherit;border:0;cursor:pointer;color:inherit}
+.progress,.card{background:var(--card);border-radius:24px;box-shadow:0 4px 20px #b8a9d426}.progress{padding:18px;margin-bottom:14px}
+.row{display:flex;justify-content:space-between;align-items:center}.pct{font-size:27px;font-weight:750;color:var(--accent)}.bar{height:11px;background:var(--soft);border-radius:99px;overflow:hidden;margin-top:12px}.fill{height:100%;background:var(--accent);border-radius:99px;transition:.3s}
+.tabs{display:flex;background:var(--card);border-radius:18px;padding:4px;margin-bottom:14px;box-shadow:0 4px 20px #b8a9d426}.tab{flex:1;padding:11px;border-radius:14px;background:none;color:var(--muted);font-weight:650}.tab.active{background:var(--soft);color:var(--text)}
+.days{display:flex;gap:8px;overflow-x:auto;padding:2px 0 12px}.day{min-width:68px;background:var(--card);padding:10px 8px;border-radius:18px;text-align:center;border:2px solid transparent}.day.active{border-color:var(--accent);background:var(--soft)}.day.today .num{color:var(--accent)}.dow{font-size:12px;color:var(--muted)}.num{font-size:19px;font-weight:700;margin-top:3px}
+.card{padding:8px 14px}.task{display:flex;align-items:center;gap:12px;padding:14px 2px;border-bottom:1px solid var(--line)}.task:last-child{border:0}.check{width:28px;height:28px;border-radius:50%;border:2px solid var(--accent);background:transparent;flex:none;font-weight:800}.check.on{background:var(--accent)}.done .name{text-decoration:line-through;color:var(--muted)}.name{font-weight:600}.meta{font-size:12px;color:var(--muted);margin-top:3px}.empty{text-align:center;padding:38px 15px;color:var(--muted)}
+.fab{position:fixed;right:20px;bottom:calc(24px + env(safe-area-inset-bottom,0px));width:60px;height:60px;border-radius:22px;background:var(--accent);font-size:30px;box-shadow:0 8px 24px #b8a9d466}
+dialog{border:0;border-radius:26px;width:min(92%,480px);padding:0;box-shadow:0 20px 60px #0004;background:var(--card);color:var(--text)}dialog::backdrop{background:#4b456377}.modal{padding:22px}.modal h2{margin-top:0}label{display:block;font-size:13px;font-weight:650;margin:14px 0 6px}input,select{width:100%;padding:13px;border:1px solid var(--line);border-radius:14px;font:inherit;background:var(--bg);color:var(--text)}.actions{display:flex;gap:10px;margin-top:20px}.actions button{flex:1;padding:13px;border-radius:15px}.primary{background:var(--accent)}.secondary{background:var(--soft)}.link{background:none;color:var(--muted);font-weight:650}
+</style></head><body>
+<div class="app"><header><h1>My Cleaning Schedule 🫧</h1><div style="color:var(--muted);margin-top:3px">Your daily &amp; weekly cleaning plan</div></header>
+<div class="tabs"><button class="tab" id="tab-daily" onclick="setTab('daily')">Daily</button><button class="tab" id="tab-weekly" onclick="setTab('weekly')">Weekly</button></div>
+<section class="progress"><div class="row"><strong id="ptitle">Today</strong><span class="pct" id="pct">0%</span></div><div class="bar"><div class="fill" id="fill"></div></div><div id="count" style="font-size:13px;color:var(--muted);margin-top:8px"></div></section>
+<div class="days" id="days"></div><section class="card" id="tasks"></section></div>
+<button class="fab" onclick="openAdd()">+</button>
+<dialog id="dlg"><form class="modal" onsubmit="saveTask(event)"><h2 id="title">Add cleaning task</h2>
+<label>Task</label><input id="taskName" required placeholder="Vacuum living room">
+<label>Room / area</label><input id="room" placeholder="Living room">
+<label>Repeats</label><select id="freq" onchange="syncDayField()"><option value="daily">Every day</option><option value="weekly">Once a week</option></select>
+<div id="dayWrap"><label>Day</label><select id="day"></select></div>
+<div class="actions"><button type="button" class="secondary" onclick="dlg.close()">Cancel</button><button class="primary">Save task</button></div></form></dialog>
+<script>
+const KEY="cleanweek-v1";let editing=null;
+const names=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],short=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+function ymd(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function weekStart(d=new Date()){let x=new Date(d),n=x.getDay();x.setDate(x.getDate()+(n===0?-6:1-n));x.setHours(0,0,0,0);return ymd(x)}
+function todayIdx(){return (new Date().getDay()+6)%7+1}
+let data=null;try{data=JSON.parse(localStorage.getItem(KEY)||"null")}catch(e){}
+data=data||{tasks:[],week:weekStart(),selected:todayIdx(),tab:"daily"};
+data.tasks.forEach(t=>{if(!t.type)t.type="weekly";if(t.type==="daily"&&!t.doneDates)t.doneDates={}});
+if(!data.tab)data.tab="daily";
+if(data.week!==weekStart()){data.week=weekStart();data.selected=todayIdx();data.tasks.forEach(t=>{if(t.type==="weekly")t.done=false});
+  let c=new Date();c.setDate(c.getDate()-60);c=ymd(c);
+  data.tasks.forEach(t=>{if(t.doneDates)Object.keys(t.doneDates).forEach(k=>{if(k<c)delete t.doneDates[k]})})}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function dateOf(i){let d=new Date(data.week+"T00:00:00");d.setDate(d.getDate()+i-1);return d}
+function isDone(t){return t.type==="daily"?!!(t.doneDates&&t.doneDates[ymd(dateOf(data.selected))]):!!t.done}
+function render(){
+  let isDaily=data.tab==="daily",s=new Date(data.week+"T00:00:00"),nowIdx=todayIdx();
+  document.documentElement.dataset.tab=data.tab;
+  document.getElementById("tab-daily").classList.toggle("active",isDaily);document.getElementById("tab-weekly").classList.toggle("active",!isDaily);
+  document.getElementById("days").innerHTML=names.map((n,i)=>{let d=new Date(s);d.setDate(s.getDate()+i);return `<button class="day ${data.selected===i+1?"active":""} ${nowIdx===i+1?"today":""}" onclick="selectDay(${i+1})"><div class="dow">${short[i]}</div><div class="num">${d.getDate()}</div></button>`}).join("");
+  let pool=data.tasks.filter(t=>t.type===(isDaily?"daily":"weekly"));
+  let ts=isDaily?pool:pool.filter(t=>t.day===data.selected);
+  document.getElementById("tasks").innerHTML=ts.length?ts.map(t=>{let d=isDone(t);return `<div class="task ${d?"done":""}"><button class="check ${d?"on":""}" onclick="toggle('${t.id}')">${d?"✓":""}</button><div style="flex:1"><div class="name">${esc(t.name)}</div><div class="meta">${esc(t.room||"")}${t.room?" · ":""}${isDaily?"Every day":"Weekly"}</div></div><button class="link" onclick="editTask('${t.id}')">Edit</button></div>`}).join(""):
+    `<div class="empty">${isDaily?"No daily tasks yet.":"Nothing scheduled for "+names[data.selected-1]+"."}<br>Add a cleaning task with +</div>`;
+  let total=pool.length,done=pool.filter(isDone).length,p=total?Math.round(done/total*100):0;
+  document.getElementById("ptitle").textContent=isDaily?(data.selected===nowIdx?"Today":names[data.selected-1]):"This week";
+  document.getElementById("pct").textContent=p+"%";document.getElementById("fill").style.width=p+"%";
+  document.getElementById("count").textContent=`${done} of ${total} completed`;save()}
+function setTab(t){data.tab=t;render()}
+function selectDay(n){data.selected=n;render()}
+function toggle(id){let t=data.tasks.find(x=>x.id===id);if(!t)return;
+  if(t.type==="daily"){t.doneDates=t.doneDates||{};let k=ymd(dateOf(data.selected));if(t.doneDates[k])delete t.doneDates[k];else t.doneDates[k]=true}
+  else t.done=!t.done;render()}
+function fillDays(v){day.innerHTML=names.map((n,i)=>`<option value="${i+1}" ${v===i+1?"selected":""}>${n}</option>`).join("")}
+function syncDayField(){dayWrap.style.display=freq.value==="weekly"?"block":"none"}
+function openAdd(){editing=null;title.textContent="Add cleaning task";taskName.value="";room.value="";freq.value=data.tab;fillDays(data.selected);syncDayField();dlg.showModal()}
+function editTask(id){let t=data.tasks.find(x=>x.id===id);if(!t)return;editing=id;title.textContent="Edit cleaning task";taskName.value=t.name;room.value=t.room||"";freq.value=t.type;fillDays(t.day||data.selected);syncDayField();dlg.showModal()}
+function saveTask(e){e.preventDefault();let old=editing?data.tasks.find(t=>t.id===editing):null;
+  let obj={id:editing||String(Date.now())+Math.random().toString(36).slice(2,7),name:taskName.value.trim(),room:room.value.trim(),type:freq.value,day:+day.value,done:old?!!old.done:false,doneDates:old?(old.doneDates||{}):{}};
+  if(editing)data.tasks[data.tasks.findIndex(t=>t.id===editing)]=obj;else data.tasks.push(obj);
+  data.tab=obj.type;dlg.close();render()}
+render();
+if("serviceWorker"in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+</script></body></html>
